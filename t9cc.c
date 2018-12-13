@@ -1,39 +1,109 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+// トークンの型を表す値
+enum
+{
+    TK_NUM = 256, //整数トークン
+    TK_EOF,       //入力の終わりを表すトークン
+};
+
+typedef struct
+{
+    int ty;
+    int val;
+    char *input;
+} Token;
+
+Token tokens[100];
+
+void tokenize(char *p)
+{
+    int i = 0;
+    while(*p)
+    {
+        if(isspace(*p))
+        {
+            p++;
+            continue;
+        }
+        if(*p == '+' || *p == '-')
+        {
+            tokens[i].ty = *p;
+            tokens[i].input = p;
+            i++;
+            p++;
+            continue;
+        }
+
+        if(isdigit(*p))
+        {
+            tokens[i].ty = TK_NUM;
+            tokens[i].input = p;
+            tokens[i].val = strtol(p, &p, 10);
+            i++;
+            continue;
+        }
+
+        fprintf(stderr, "トークナイズできません: %s\n",p);
+        exit(1);
+    }
+
+    tokens[i].ty = TK_EOF;
+    tokens[i].input = p;
+}
+
+void error(int i)
+{
+    fprintf(stderr, "予期せぬトークンです: %s\n",
+            tokens[i].input);
+    exit(1);
+}
 
 int main(int argc, char **argv)
 {
-    if (argc != 2)
+    if(argc != 2)
     {
-        fprintf(stderr, "引数の個数が正しくない\n");
+        fprintf(stderr, "引数の個数が正しくありません\n");
         return 1;
     }
 
-    char *p = argv[1];
+    tokenize(argv[1]);
 
     printf(".intel_syntax noprefix\n");
     printf(".global _main\n");
     printf("_main:\n");
-    printf("    mov rax, %ld\n", strtol(p, &p, 10));
-    
-    while(*p)
+
+    if (tokens[0].ty != TK_NUM)
+        error(0);
+    printf("    mov rax %d\n", tokens[0].val);
+
+    int i = 1;
+    while(tokens[i].ty != TK_EOF)
     {
-        if(*p == '+')
+        if(tokens[i].ty == '+')
         {
-            p++;
-            printf("    add rax, %ld\n", strtol(p, &p, 10));
+            i++;
+            if(tokens[i].ty != TK_NUM)
+                error(i);
+            printf("    add rax, %d\n", tokens[i].val);
+            i++;
             continue;
         }
 
-        if(*p == '-')
+        if(tokens[i].ty == '-')
         {
-            p++;
-            printf("    sub rax, %ld\n", strtol(p, &p, 10));
+            i++;
+            if(tokens[i].ty != TK_NUM)
+                error(i);
+            printf("    sub rax, %d\n", tokens[i].val);
+            i++;
             continue;
         }
 
-        fprintf(stderr, "not expected character: '%c'\n", *p);
-        return 1;
+        error(i);
     }
 
     printf("    ret\n");
